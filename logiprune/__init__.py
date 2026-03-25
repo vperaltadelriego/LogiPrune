@@ -63,7 +63,7 @@ Quick start — Combined pipeline
     # Step 3: search (FLAML / Optuna / GridSearch) on grid_final
 """
 
-__version__ = "0.2.1"
+__version__ = "0.2.4"
 __author__  = "Víctor Manuel Peralta Del Riego"
 __email__   = "vperalta@ucaribe.edu.mx"
 __license__ = "MIT"
@@ -75,7 +75,34 @@ from .relations import (
     INCOMPATIBLE, A_OR_B, CONTINGENCY,
     classify_pair, RelationResult,
 )
-from .discretize import AdaptiveDiscretizer
+from .decomposer import (
+    MetricAwareDecomposer,
+    DecompositionReport,
+    MetricCeiling,
+    SubpopulationStrategy,
+)
+from .contradiction import (
+    ContradictionAnalyzer,
+    ObservationPruner,
+    ViolationSet,
+    ContradictionReport,
+    PruningResult,
+)
+from .completeness import (
+    PropositionalModel,
+    CompletenessAnalyzer,
+    ViolationTracker,
+    AbductiveProposer,
+    Implication,
+    CompletenessReport,
+    ViolationBatch,
+    AbductiveCandidate,
+)
+from .discretize import (
+    AdaptiveDiscretizer,
+    AsymmetricSweepAnalyzer,
+    ModelLifetimeEstimator,
+)
 from .sweeper    import SWTSSweeper
 from .fuzzy      import FuzzyDisjunctionAnalyzer, TCONORMS
 
@@ -91,9 +118,31 @@ from .entropy import (
 from .entropy_pipeline import LogiPruneEntropy
 
 __all__ = [
+    # Paper 3 — completeness & open-context
+    "PropositionalModel",
+    "CompletenessAnalyzer",
+    "ViolationTracker",
+    "AbductiveProposer",
+    "Implication",
+    "CompletenessReport",
+    "ViolationBatch",
+    "AbductiveCandidate",
+    # Paper 3 — metric-aware decomposition
+    "MetricAwareDecomposer",
+    "DecompositionReport",
+    "MetricCeiling",
+    "SubpopulationStrategy",
+    # Paper 3 — contradiction & observation pruning
+    "ContradictionAnalyzer",
+    "ObservationPruner",
+    "ViolationSet",
+    "ContradictionReport",
+    "PruningResult",
     # Paper 1
     "LogiPrune",
     "AdaptiveDiscretizer",
+    "AsymmetricSweepAnalyzer",
+    "ModelLifetimeEstimator",
     "SWTSSweeper",
     "FuzzyDisjunctionAnalyzer",
     "TCONORMS",
