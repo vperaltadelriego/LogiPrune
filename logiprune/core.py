@@ -39,7 +39,32 @@ PRUNING_WEIGHT = {
 IMPL_RELS = {A_IMPLIES_B, B_IMPLIES_A, BICONDITIONAL}
 
 # Empirical constant: seconds per row per GridSearch configuration
-_COST_PER_ROW_PER_CONFIG = 1e-5
+def _benchmark_cost_per_row(n_probe: int = 500) -> float:
+    """
+    v0.2.3: Dynamic micro-benchmark to replace the hardcoded 1e-5 constant.
+    (Gemini review — constant was calibrated on a specific machine and
+    diverges on laptops, servers, and cloud VMs.)
+
+    Trains a tiny LogisticRegression on n_probe random rows and returns
+    the measured seconds-per-row-per-config. Falls back to 1e-5 on failure.
+
+    Cost: runs once at import time, ~5-20ms.
+    """
+    try:
+        import time
+        from sklearn.linear_model import LogisticRegression
+        rng = np.random.default_rng(0)
+        X_p = rng.standard_normal((n_probe, 5))
+        y_p = (X_p[:, 0] > 0).astype(int)
+        t0 = time.perf_counter()
+        LogisticRegression(max_iter=50, random_state=0).fit(X_p, y_p)
+        elapsed = time.perf_counter() - t0
+        # cost per row per config ≈ elapsed / n_probe, with a floor
+        return max(elapsed / n_probe, 1e-8)
+    except Exception:
+        return 1e-5   # safe fallback
+
+_COST_PER_ROW_PER_CONFIG: float = _benchmark_cost_per_row()
 
 
 class LogiPrune:

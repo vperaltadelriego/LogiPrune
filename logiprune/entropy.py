@@ -196,13 +196,14 @@ def truth_table_profile(col_a: str, col_b: str,
         If |H_shannon - H_renyi| / H_shannon > this value, flag open context.
         Default 0.30 means a 30% gap triggers the flag.
     """
-    ab = (a > threshold).astype(int)
-    bb = (b > threshold).astype(int)
+    ab = (a > threshold).astype(np.uint8)
+    bb = (b > threshold).astype(np.uint8)
     n  = len(a)
-    n11 = int(((ab==1)&(bb==1)).sum())
-    n10 = int(((ab==1)&(bb==0)).sum())
-    n01 = int(((ab==0)&(bb==1)).sum())
-    n00 = int(((ab==0)&(bb==0)).sum())
+    # v0.2.3: bincount vectorization — encode (ab,bb) as 0..3 in one pass
+    states_4 = ab.astype(np.int32) * 2 + bb.astype(np.int32)
+    counts_4 = np.bincount(states_4, minlength=4)
+    # states: 0=⟨0,0⟩ 1=⟨0,1⟩ 2=⟨1,0⟩ 3=⟨1,1⟩
+    n00,n01,n10,n11 = int(counts_4[0]),int(counts_4[1]),int(counts_4[2]),int(counts_4[3])
     w11,w10,w01,w00 = n11/n, n10/n, n01/n, n00/n
     ws = [w11, w10, w01, w00]
 
@@ -257,25 +258,35 @@ def conditional_entropy_gate(a: np.ndarray, b: np.ndarray,
     h_retain : float
         H(D|A,B) above this → ∨E blocked.
     """
-    ab = (a > threshold).astype(int)
-    bb = (b > threshold).astype(int)
-    db = (d > 0.5).astype(int)
+    ab = (a > threshold).astype(np.uint8)
+    bb = (b > threshold).astype(np.uint8)
+    db = (d > 0.5).astype(np.uint8)
     n  = len(a)
 
-    h_cond  = 0.0
+    # --- v0.2.3 vectorized via np.bincount (Gemini review, 10-50x faster) ---
+    # Encode the 8-state joint (ab, bb, db) as a single integer in [0,7]
+    # state = ab*4 + bb*2 + db  →  shape (n,), values in {0..7}
+    states_8 = ab.astype(np.int32) * 4 + bb.astype(np.int32) * 2 + db.astype(np.int32)
+    counts_8 = np.bincount(states_8, minlength=8).astype(float)   # shape (8,)
+
+    # Aggregate: for each (ab,bb) cell, sum counts across db=0 and db=1
+    # cell index c = ab*2 + bb  →  c in {0,1,2,3}
+    # counts_8[c*2]   = n(ab, bb, db=0)
+    # counts_8[c*2+1] = n(ab, bb, db=1)
+    h_cond   = 0.0
     n_states = 0
-    for av in [0, 1]:
-        for bv in [0, 1]:
-            mask = (ab == av) & (bb == bv)
-            n_ab = int(mask.sum())
-            if n_ab == 0:
-                continue
-            n_states += 1
-            p_ab = n_ab / n
-            p1   = float(db[mask].mean())
-            p0   = 1.0 - p1
-            h_ab = -(p1 * np.log2(p1 + 1e-12) + p0 * np.log2(p0 + 1e-12))
-            h_cond += p_ab * h_ab
+    for c in range(4):
+        n0 = counts_8[c * 2]
+        n1 = counts_8[c * 2 + 1]
+        n_ab = n0 + n1
+        if n_ab == 0:
+            continue
+        n_states += 1
+        p_ab = n_ab / n
+        p1   = n1 / n_ab
+        p0   = 1.0 - p1
+        h_ab = -(p1 * np.log2(p1 + 1e-12) + p0 * np.log2(p0 + 1e-12))
+        h_cond += p_ab * h_ab
 
     if h_cond < h_compress:
         decision = 'compress_and_eliminate'
